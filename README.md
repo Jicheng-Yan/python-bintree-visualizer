@@ -56,3 +56,62 @@ vis.export()
 ```fish
 pytest -q
 ```
+
+## Sequence diagram
+
+The following Mermaid diagram shows end-to-end call flows across CLI actions (demo, run, grammar), the grammar builder, visual debugger export, and the browser viewer.
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant CLI as btree (CLI)
+  participant Main as bintree.cli:main()
+  participant BST as BinarySearchTree
+  participant Grammar as grammar_tree (builder)
+  participant Vis as VisualDebugger
+  participant FS as FileSystem
+  participant Browser
+  participant Viewer as HTML Viewer (JS)
+
+  User->>CLI: btree <action> [--input ...] [--out dir] [--legacy]
+  CLI->>Main: parse args and dispatch
+
+  alt action == "demo"
+    Main->>BST: insert(k) xN
+    Main->>Vis: record("insert", k, tree)
+    Main->>BST: delete(3), replace(6,5), search(7)
+    Main->>Vis: record("delete"/"replace"/"search", key, tree)
+  else action == "run"
+    Main->>FS: read ops.json
+    loop for each op
+      Main->>BST: insert/delete/replace/search
+      Main->>Vis: record(op, key, tree)
+    end
+  else action == "grammar"
+    opt --input spec.json provided
+      Main->>FS: read spec.json
+    end
+    Main->>Grammar: build (subject-root by default)
+    Grammar->>BST: produce tree (subject root; SP leaves up; PP leaves down)
+    Main->>Vis: record("grammar", 0, tree)
+  end
+
+  Main->>Vis: export()
+  Vis->>FS: write out_dir/trace.json
+  Vis->>FS: write out_dir/index.html
+  Main-->>User: Exported visual debugger path
+
+  User->>Browser: open out_dir/index.html
+  Browser->>Viewer: load HTML+JS
+  Viewer->>FS: fetch("trace.json")
+  FS-->>Viewer: JSON snapshots
+
+  Viewer->>Viewer: build sidebar, render selected snapshot
+  Viewer->>Viewer: left-to-right layout (SP up, time/state up; PP down)
+  Viewer->>Viewer: draw links + colored nodes
+
+  opt navigate snapshots
+    User->>Viewer: Prev/Next or sidebar click
+    Viewer->>Viewer: render(other snapshot)
+  end
+```
