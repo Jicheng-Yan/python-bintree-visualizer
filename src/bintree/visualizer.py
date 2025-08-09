@@ -40,7 +40,7 @@ class VisualDebugger:
         return html_path
 
     def _html_template(self) -> str:
-        # Minimal interactive viewer using vanilla JS and SVG
+        # Minimal interactive viewer using vanilla JS and SVG (left-to-right layout)
         return """<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -70,7 +70,7 @@ text{font-size:12px;dominant-baseline:middle;text-anchor:middle}
     <span id=\"info\"></span>
   </div>
   <div id=\"canvas\">
-    <svg id=\"svg\" width=\"2000\" height=\"1200\"></svg>
+    <svg id=\"svg\" width=\"2200\" height=\"1200\"></svg>
   </div>
 </div>
 <script>
@@ -78,23 +78,26 @@ async function loadTrace(){
   const res = await fetch('trace.json');
   return await res.json();
 }
-function layoutTree(node,x,y,dx,arr){
+// Left-to-right layout: x increases with depth, y fans up/down
+function layoutTreeLR(node,x,y,dy,arr,stepX){
   if(!node) return;
-  const here={x,y,key:node.key};
-  arr.push(here);
+  arr.push({x,y,key:node.key});
+  const nx = x + stepX;
   if(node.left){
-    arr.push({x1:x,y1:y,x2:x-dx,y2:y+80,link:true});
-    layoutTree(node.left,x-dx,y+80,dx/1.8,arr);
+    const ny = y - dy;
+    arr.push({x1:x,y1:y,x2:nx,y2:ny,link:true});
+    layoutTreeLR(node.left,nx,ny,Math.max(40, dy/1.8),arr,stepX);
   }
   if(node.right){
-    arr.push({x1:x,y1:y,x2:x+dx,y2:y+80,link:true});
-    layoutTree(node.right,x+dx,y+80,dx/1.8,arr);
+    const ny = y + dy;
+    arr.push({x1:x,y1:y,x2:nx,y2:ny,link:true});
+    layoutTreeLR(node.right,nx,ny,Math.max(40, dy/1.8),arr,stepX);
   }
 }
 function render(tree){
   const svg=document.getElementById('svg');
   svg.innerHTML='';
-  const elems=[]; layoutTree(tree,1000,60,360,elems);
+  const elems=[]; layoutTreeLR(tree,80,600,260,elems,140);
   for(const e of elems){
     if(e.link){
       const l=document.createElementNS('http://www.w3.org/2000/svg','line');
